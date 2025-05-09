@@ -180,11 +180,36 @@ def test_lab_5_2():
 # update_bow_in_db(noticias_df)
 
 # test_lab_5_1()
-test_lab_5_2()
+# test_lab_5_2()
 
 
-idx = InvertedIndex()
-idx.build_from_db()
+def cosine_similarity_using_index():
+    idx = InvertedIndex()
+    idx.build_from_db()
+
+    test_queries = [
+        (
+            "¿Cuáles son las últimas innovaciones en la banca digital y la tecnología financiera?",
+            4,
+        ),
+        (
+            "evolución de la inflación y el crecimiento de la economía en los últimos años",
+            10,
+        ),
+        (
+            "avances sobre sostenibilidad y energías renovables para el medio ambiente",
+            8,
+        ),
+    ]
+
+    for test in test_queries:
+        results = idx.cosine_search(test[0], test[1])
+        print(f"Top {test[1]} documentos más similares:")
+        for doc_id, score in results:
+            print(f"Doc {doc_id}: {score:.3f}: ", idx.showDocument(doc_id))
+
+
+cosine_similarity_using_index()
 
 
 def AND(list1, list2):

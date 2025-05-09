@@ -1,5 +1,5 @@
 from math import sqrt
-from utils import fetch_data
+from utils import fetch_data, fetch_document
 import bisect
 import numpy as np
 
@@ -11,6 +11,10 @@ class InvertedIndex:
         self.index = {}  # key should be a word, value should be a list of doc_id, word freq in doc tuples in descending order
         self.idf = {}
         self.length = {}
+
+    def showDocument(self, id: int):
+        df = fetch_document(id)
+        return df["contenido"]
 
     def insert_index_sorted(self, word, id, freq):
         if word not in self.index:
@@ -73,21 +77,26 @@ class InvertedIndex:
 
         query_vec = []
 
-        for col, t in enumerate(tokens):
-            # progressively build query vector
-            tf = query_bow[t]
-            idf = 1
+        N = len(self.length)  # n total documents
+
+        for col, tok in enumerate(tokens):
+            # progressive query vector building
+            tf = query_bow[tok]  # tf is tok's raw frequency in query
+            tf = 1 + np.log(tf) if tf > 0 else 0
+            df = self.idf[tok]  # n of documents that contain tok
+            idf = np.log(N / df)
             query_vec.append(tf * idf)
 
-            matching_docs = self.L(t)  # returns list of docs that contain word
-            idf = 1
-            for id, freq in matching_docs:
+            matching_docs = self.L(tok)  # returns list of docs that contain word
+            for id, raw_freq in matching_docs:
                 # init vector if not present
                 if id not in vectors:
                     vectors[id] = [0] * len(tokens)
-                vectors[id][col] = freq * idf  # freq is tf
+                tf = 1 + np.log(raw_freq) if raw_freq > 0 else 0
+                vectors[id][col] = tf * idf  # calc tf-idf here
 
         query_mag = np.linalg.norm(query_vec)
+
         # now calculate mag of all documents and also cos(angle)
         for id, vec in vectors.items():
             curr_mag = np.linalg.norm(vec)

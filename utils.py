@@ -19,6 +19,17 @@ def connect_db():
     return conn
 
 
+def fetch_document(id: int):
+    conn = connect_db()
+    query = f"SELECT * FROM noticias WHERE noticias.id = {id};"
+    df = pd.read_sql(query, conn)
+    df["bag_of_words"] = df["bag_of_words"].apply(
+        lambda x: json.loads(x) if isinstance(x, str) else x
+    )
+    conn.close()
+    return df
+
+
 def fetch_data():
     conn = connect_db()
     query = "SELECT id, contenido, bag_of_words FROM noticias;"
