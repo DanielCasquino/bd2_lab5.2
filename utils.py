@@ -1,4 +1,5 @@
 import psycopg2
+import warnings
 import json
 import pandas as pd
 import nltk
@@ -7,10 +8,16 @@ import re
 stemmer = nltk.stem.SnowballStemmer("spanish")
 lemmatizer = nltk.stem.WordNetLemmatizer()
 
+# Omitir advertencias de pandas sobre SQLAlchemy
+warnings.filterwarnings(
+    "ignore",
+    message="pandas only supports SQLAlchemy connectable",
+    category=UserWarning,
+)
 
 def connect_db():
     conn = psycopg2.connect(
-        dbname="bagofwords",
+        dbname="Lab5.1",
         user="postgres",
         password="postgres",
         host="localhost",

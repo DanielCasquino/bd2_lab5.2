@@ -1,8 +1,7 @@
 import json
-import warnings
 import time
 import pandas as pd
-
+import math
 from inverted_index import InvertedIndex
 from utils import connect_db, preprocess, compute_bow
 
@@ -12,12 +11,7 @@ from utils import connect_db, preprocess, compute_bow
 # nltk.download("omw-1.4")
 
 
-# Omitir advertencias de pandas sobre SQLAlchemy
-warnings.filterwarnings(
-    "ignore",
-    message="pandas only supports SQLAlchemy connectable",
-    category=UserWarning,
-)
+
 
 
 def update_bow_in_db(dataframe):
@@ -40,6 +34,8 @@ def update_bow_in_db(dataframe):
 
 def apply_boolean_query(query, table="noticias"):
     tokens = preprocess(query)
+    if (tokens[0] == "or" or tokens[0] == "and" or tokens[0] == "and-not"):
+        tokens = tokens[1:]
     # simple sequential parser:
     expects_keyword = True
     final_query = f"SELECT * FROM {table} WHERE bag_of_words ? "
@@ -76,17 +72,50 @@ def apply_boolean_query(query, table="noticias"):
 
 def bows_to_vectors(df):
     vocab = set()
+    df_counts = dict()
     for bow in df["bag_of_words"]:
-        vocab.update(bow.keys())
+        for word in bow:
+            vocab.add(word)
+            if word in df_counts:
+                df_counts[word] += 1
+            else:
+                df_counts[word] = 1
+    
     vocab = sorted(vocab)
+    N = len(df)
+    idf = {word: math.log(N / df_counts[word]) for word in vocab}
 
-    vectors = []
+    tf = []
     for bow in df["bag_of_words"]:
-        vector = [bow.get(word, 0) for word in vocab]
-        vectors.append(vector)
+        vector = [1 + math.log(bow.get(word, 0)) if bow.get(word, 0) > 0 else 0 for word in vocab]
+        tf.append(vector)
+    
+    tf_idf = []
+    for tf_vector in tf:
+        tf_idf_vector = [t * idf[word] for word, t in zip(vocab, tf_vector)]
+        tf_idf.append(tf_idf_vector)
+    
+    normalized_tf_idf = []
+    for val in tf_idf:
+        mag = math.sqrt(sum([t**2 for t in val]))
+        if mag > 0:
+            val = [t / mag for t in val]
+        normalized_tf_idf.append(val)
 
-    df["vector"] = vectors
-    return df, vocab
+    df["tf_idf"] = normalized_tf_idf
+
+    return df, vocab, idf
+
+def calculate_similarity(query, df, vocab, idf):
+    query_bow = compute_bow(query)
+    query_tf = [1 + math.log(query_bow.get(word, 0)) if query_bow.get(word, 0) > 0 else 0 for word in vocab]
+    query_tf_idf = [t * idf[word] for word, t in zip(vocab, query_tf)]
+    query_mag = math.sqrt(sum([t**2 for t in query_tf_idf]))
+    query_normalized = [t / query_mag for t in query_tf_idf]
+    df["similarity"] = df["tf_idf"].apply(lambda x: sum([a * b for a, b in zip(x, query_normalized)]))
+    df = df.sort_values(by="similarity", ascending=False)
+    return df
+
 
 
 def search(query, top_k=5, table="noticias"):
@@ -99,9 +128,9 @@ def search(query, top_k=5, table="noticias"):
         else:
             final_query += s
     df = apply_boolean_query(final_query, table)
-    df, vocab = bows_to_vectors(df)
-    print(df)
-    return df[:top_k]
+    df, vocab, idf = bows_to_vectors(df)
+    df = calculate_similarity(query, df, vocab, idf)
+    return df.head(top_k)
 
 
 def test_lab_5_1():
@@ -180,7 +209,7 @@ def test_lab_5_2():
 # update_bow_in_db(noticias_df)
 
 # test_lab_5_1()
-# test_lab_5_2()
+test_lab_5_2()
 
 
 def cosine_similarity_using_index():
@@ -209,7 +238,7 @@ def cosine_similarity_using_index():
             print(f"Doc {doc_id}: {score:.3f}: ", idx.showDocument(doc_id))
 
 
-cosine_similarity_using_index()
+#cosine_similarity_using_index()
 
 
 def AND(list1, list2):
