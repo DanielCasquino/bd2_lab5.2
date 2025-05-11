@@ -413,13 +413,28 @@ def cosine_similarity_using_index():
 #cosine_similarity_using_index()
 
 def AND(list1, list2):
-    # Implementar la intersección de dos listas O(n +m)
-    pass
-
+    i = j = 0
+    result = list()
+    while (i < len(list1) and j < len(list2)):
+        if (list1[i] == list2[j]):
+            result.append(list1[i])
+            i += 1
+            j += 1
+        elif (list1[i] < list2[j]):
+            i += 1
+        else:
+            j += 1
+    return result
 
 def OR(list1, list2):
-    # Implementar la unión de dos listas O(n +m)
-    pass
+    i = j = 0
+    result = set()
+    for id in list1:
+        result.add(id)
+    for id in list2:
+        result.add(id)
+    result = sorted(result)
+    return result
 
 
 def AND_NOT(list1, list2):
