@@ -61,6 +61,11 @@ def fetch_stopwords():
     stopword_list = df["word"].tolist()
     return stopword_list
 
+print("Fetching data and stopwords from DB")
+stopwords = fetch_stopwords()
+noticias_df = fetch_data()
+print("Data fetched\n")
+
 def preprocess(text):
     text = text.lower()
     text = re.sub(r"[^a-záéíóúñü\s]", "", text)
@@ -89,9 +94,6 @@ def update_bow_in_db(dataframe):
     conn.commit()
     cursor.close()
     conn.close()
-
-stopwords = fetch_stopwords()
-noticias_df = fetch_data()
 
 # grammar:
 # S -> S A B | keyword
@@ -194,57 +196,6 @@ def search(query, top_k=5, table="noticias"):
     df, vocab, idf = bows_to_vectors(df)
     df = calculate_similarity(query, df, vocab, idf)
     return df.head(top_k)
-
-def test_lab_5_1():
-    test_queries = [
-        "ingeniería OR software AND desarrollo",
-        "inteligencia AND artificial AND-NOT humano",
-        "ciencia OR tecnología AND-NOT medicina",
-        "educación AND aprendizaje OR enseñanza",
-        "computción AND matemática AND-NOT física",
-        "derecho OR leyes AND justicia",
-        "historia OR geografía AND-NOT política",
-        "arte OR cultura AND-NOT entretenimiento",
-        "musica AND danza OR teatro",
-        "salud AND bienestar OR medicina",
-    ]
-
-    tables = ["noticias", "noticias600", "noticias300", "noticias150"]
-    results = []
-    time_totals = {
-        "noticias": [],
-        "noticias150": [],
-        "noticias300": [],
-        "noticias600": [],
-    }
-
-    for table in tables:
-        for query in test_queries:
-            start = time.time()
-            df = apply_boolean_query(query, table)
-            end = time.time()
-            elapsed_ms = (end - start) * 1000  # Convertir a milisegundos
-            time_totals[table].append(elapsed_ms)
-            results.append(
-                {
-                    "tabla": table,
-                    "query": query,
-                    "tiempo_ms": elapsed_ms,
-                    "resultados": len(df),
-                }
-            )
-            print(f"{table} | {query} | {elapsed_ms:.2f} ms | {len(df)} resultados")
-
-    print("\nPromedio de tiempo por tabla:")
-    for table in tables:
-        times = time_totals[table]
-        avg = sum(times) / len(times) if times else 0
-        print(f"{table}: {avg:.2f} ms")
-
-    with open("resultados.json", "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=4)
-
-    print("Resultados guardados en resultados.csv")
 
 def test1():
     test_queries = [
@@ -458,6 +409,12 @@ def test4():
         for doc_id, score in results:
             print(f"Doc {doc_id}: {score:.3f}: ", idx.showDocument(doc_id))
 
-#test1()
-#test3()
-test4()
+test = input("¿Cuál item del laboratorio desea ejecutar? (1, 3, 4): ")
+if test == "1":
+    test1()
+elif test == "3":
+    test3()
+elif test == "4":
+    test4()
+else:
+    print("No se ingreso un item valido")
