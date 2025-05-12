@@ -10,6 +10,8 @@ import re
 import bisect
 import numpy as np
 
+#Code by: Danee2108, Jvnc0503
+
 #nltk.download("punkt")
 #nltk.download("punkt_tab")
 
