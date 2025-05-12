@@ -10,8 +10,8 @@ import re
 import bisect
 import numpy as np
 
-nltk.download("punkt")
-nltk.download("punkt_tab")
+#nltk.download("punkt")
+#nltk.download("punkt_tab")
 
 stemmer = nltk.stem.SnowballStemmer("spanish")
 lemmatizer = nltk.stem.WordNetLemmatizer()
@@ -33,7 +33,6 @@ def connect_db():
     )
     return conn
 
-
 def fetch_document(id: int):
     conn = connect_db()
     query = f"SELECT * FROM noticias WHERE noticias.id = {id};"
@@ -43,7 +42,6 @@ def fetch_document(id: int):
     )
     conn.close()
     return df
-
 
 def fetch_data():
     conn = connect_db()
@@ -55,7 +53,6 @@ def fetch_data():
     conn.close()
     return df
 
-
 def fetch_stopwords():
     conn = connect_db()
     query = "SELECT word FROM stopwords;"
@@ -64,7 +61,6 @@ def fetch_stopwords():
     stopword_list = df["word"].tolist()
     return stopword_list
 
-
 def preprocess(text):
     text = text.lower()
     text = re.sub(r"[^a-záéíóúñü\s]", "", text)
@@ -72,7 +68,6 @@ def preprocess(text):
     filtered = [token for token in tokens if token not in stopwords]
     stem = [stemmer.stem(w) for w in filtered]
     return stem
-
 
 def compute_bow(text):
     processed_text = preprocess(text)
@@ -83,7 +78,6 @@ def compute_bow(text):
         else:
             bow[word] = 1
     return bow
-
 
 def update_bow_in_db(dataframe):
     conn = connect_db()
@@ -103,7 +97,6 @@ noticias_df = fetch_data()
 # S -> S A B | keyword
 # B -> S | keyword
 # A -> OR | AND | AND-NOT
-
 
 def apply_boolean_query(query, table="noticias"):
     tokens = preprocess(query)
@@ -141,7 +134,6 @@ def apply_boolean_query(query, table="noticias"):
     conn.close()
 
     return df
-
 
 def bows_to_vectors(df):
     vocab = set()
@@ -189,8 +181,6 @@ def calculate_similarity(query, df, vocab, idf):
     df = df.sort_values(by="similarity", ascending=False)
     return df
 
-
-
 def search(query, top_k=5, table="noticias"):
     processed_query = preprocess(query)
     # build query from stemmed
@@ -204,7 +194,6 @@ def search(query, top_k=5, table="noticias"):
     df, vocab, idf = bows_to_vectors(df)
     df = calculate_similarity(query, df, vocab, idf)
     return df.head(top_k)
-
 
 def test_lab_5_1():
     test_queries = [
@@ -257,8 +246,7 @@ def test_lab_5_1():
 
     print("Resultados guardados en resultados.csv")
 
-
-def test_lab_5_2():
+def test1():
     test_queries = [
         "¿Cuáles son las últimas innovaciones en la banca digital y la tecnología financiera?",
         "evolución de la inflación y el crecimiento de la economía en los últimos años",
@@ -274,16 +262,6 @@ def test_lab_5_2():
             print(f"Texto: {row['contenido'][:200]}...")
         print("-" * 50)
 
-
-# noticias_df = fetch_data()
-# stopwords = fetch_stopwords()
-# print(noticias_df)
-# print(stopwords)
-# update_bow_in_db(noticias_df)
-
-# test_lab_5_1()
-test_lab_5_2()
-
 class InvertedIndex:
     def __init__(self):
         self.index = {}  # key should be a word, value should be a list of doc_id, word freq in doc tuples in descending order
@@ -293,6 +271,14 @@ class InvertedIndex:
     def showDocument(self, id: int):
         df = fetch_document(id)
         return df["contenido"]
+    
+    def showDocuments(self, ids: list):
+        docs = []
+        for tuple in ids:
+            id = tuple[0]
+            df = fetch_document(id)
+            docs.append(df["contenido"])
+        return docs
 
     def insert_index_sorted(self, word, id, freq):
         if word not in self.index:
@@ -341,6 +327,7 @@ class InvertedIndex:
                 self.update_length(row["id"], freq)
 
     def L(self, word) -> list[tuple[str, int]]:
+        word = stemmer.stem(word)
         return self.index.get(word, [])
 
     def cosine_search(self, query, top_k=5):
@@ -384,33 +371,6 @@ class InvertedIndex:
         result = sorted(score.items(), key=lambda tup: tup[1], reverse=True)
         # retornamos los k documentos mas relevantes (de mayor similitud a la query)
         return result[:top_k]
-
-def cosine_similarity_using_index():
-    idx = InvertedIndex()
-    idx.build_from_db()
-
-    test_queries = [
-        (
-            "¿Cuáles son las últimas innovaciones en la banca digital y la tecnología financiera?",
-            4,
-        ),
-        (
-            "evolución de la inflación y el crecimiento de la economía en los últimos años",
-            10,
-        ),
-        (
-            "avances sobre sostenibilidad y energías renovables para el medio ambiente",
-            8,
-        ),
-    ]
-
-    for test in test_queries:
-        results = idx.cosine_search(test[0], test[1])
-        print(f"Top {test[1]} documentos más similares:")
-        for doc_id, score in results:
-            print(f"Doc {doc_id}: {score:.3f}: ", idx.showDocument(doc_id))
-
-#cosine_similarity_using_index()
 
 def AND(list1, list2):
     i = j = 0
@@ -458,3 +418,46 @@ def AND_NOT(list1, list2):
         result.append(list1[i])
         i += 1
     return result
+
+def test3():
+    idx = InvertedIndex()
+    idx.build_from_db()
+    # Prueba 1
+    result = AND(idx.L("sostenibilidad"), AND(idx.L("ambiente"), idx.L("renovables")))
+    print("sostenibilidad AND ambiente AND renovable: ", idx.showDocuments(result))
+
+    # Prueba 2
+    result = AND(idx.L("tecnología"), OR(idx.L("banca"), idx.L("finanzas")))
+    print("tecnología AND (banca OR finanzas): ", idx.showDocuments(result))
+
+    # Prueba 3
+    result = AND_NOT(idx.L("economía"), idx.L("inflación"))
+    print("economía AND-NOT inflación: " , idx.showDocuments(result))
+
+def test4():
+    idx = InvertedIndex()
+    idx.build_from_db()
+    test_queries = [
+        (
+            "¿Cuáles son las últimas innovaciones en la banca digital y la tecnología financiera?",
+            4,
+        ),
+        (
+            "evolución de la inflación y el crecimiento de la economía en los últimos años",
+            10,
+        ),
+        (
+            "avances sobre sostenibilidad y energías renovables para el medio ambiente",
+            8,
+        ),
+    ]
+
+    for test in test_queries:
+        results = idx.cosine_search(test[0], test[1])
+        print(f"Top {test[1]} documentos más similares:")
+        for doc_id, score in results:
+            print(f"Doc {doc_id}: {score:.3f}: ", idx.showDocument(doc_id))
+
+#test1()
+#test3()
+test4()
